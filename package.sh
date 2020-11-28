@@ -52,7 +52,7 @@ mkdir -p ${TMPDIR}/etc/systemd/system || exit 1
 mkdir -p ${TMPDIR}/home/pi || exit 1
 mkdir -p ${TMPDIR}/root || exit 1
 
-mkdir -p ${TMPDIR}/usr/bin || exit 1
+#mkdir -p ${TMPDIR}/usr/bin || exit 1
 mkdir -p ${TMPDIR}/usr/sbin || exit 1
 mkdir -p ${TMPDIR}/usr/share || exit 1
 mkdir -p ${TMPDIR}/usr/lib || exit 1
