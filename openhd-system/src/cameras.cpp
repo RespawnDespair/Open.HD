@@ -13,10 +13,12 @@
 #include <iostream>
 #include <sstream>
 
+#include <libusb.h>
 
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/process.hpp>
 #include <boost/regex.hpp>
 
 #include "json.hpp"
@@ -64,6 +66,9 @@ void Cameras::discover() {
             break;
         }
     }
+
+    detect_flir();
+    detect_seek();
 
     detect_v4l2();
     detect_ip();
@@ -114,6 +119,8 @@ void Cameras::detect_raspberrypi_csi() {
         camera.vendor = "Raspberry Pi";
         camera.type = CameraTypeRaspberryPiCSI;
         camera.bus = "0";
+        camera.index = m_discover_index;
+        m_discover_index++;
         CameraEndpoint endpoint;
         endpoint.bus = camera.bus;
         endpoint.support_h264 = true;
@@ -142,6 +149,8 @@ void Cameras::detect_raspberrypi_csi() {
         camera.vendor = "Raspberry Pi";
         camera.type = CameraTypeRaspberryPiCSI;
         camera.bus = "1";
+        camera.index = m_discover_index;
+        m_discover_index++;
         CameraEndpoint endpoint;
         endpoint.bus = camera.bus;
         endpoint.support_h264 = true;
@@ -269,6 +278,8 @@ void Cameras::probe_v4l2_device(std::string device) {
     }
 
     if (!found) {
+        camera.index = m_discover_index;
+        m_discover_index++;
         m_cameras.push_back(camera);
     }
 
@@ -301,6 +312,11 @@ bool Cameras::process_video_node(Camera& camera, CameraEndpoint& endpoint, std::
     } else if (driver == "tegra-video") {
         camera.type = CameraTypeJetsonCSI;
         std::cerr << "Found Jetson CSI camera" << std::endl;
+    } else if (driver == "v4l2 loopback") {
+        // this is temporary, we are not going to use v4l2loopback for thermal cameras they'll be directly
+        // handled by the camera service instead
+        camera.type = CameraTypeV4L2Loopback;
+        std::cerr << "Found v4l2 loopback camera (likely a thermal camera)" << std::endl;
     } else {
         /*
          * This is primarily going to be the bcm2835-v4l2 interface on the Pi, and non-camera interfaces.
@@ -399,6 +415,119 @@ void Cameras::detect_ip() {
 }
 
 
+void Cameras::detect_flir() {
+    /*
+     * What this is:
+     * 
+     * We're detecting whether the flir one USB thermal camera is connected. We then run the flir one driver
+     * with systemd.
+     *
+     * What happens after:
+     * 
+     * The systemd service starts, finds the camera and begins running on the device node we select. Then
+     * we will let it be found by the rest of this class just like any other camera, so it gets recorded 
+     * in the manifest and found by the camera service.
+     *
+     *
+     * todo: this should really be marking the camera as a thermal cam instead of starting v4l2loopback and
+     *       abstracting it away like this, but the camera service doesn't yet have a thermal handling class
+     */
+
+    libusb_context *context = nullptr;
+    int result = libusb_init(&context);
+    if (result) {
+        std::cerr << "Failed to initialize libusb" << std::endl;
+        return;
+    }
+
+    libusb_device_handle *handle = libusb_open_device_with_vid_pid(nullptr, FLIR_ONE_VENDOR_ID, FLIR_ONE_PRODUCT_ID);
+
+    if (handle) {
+        std::vector<std::string> ar { 
+            "start", "flirone"
+        };
+
+        boost::process::child p(boost::process::search_path("systemctl"), ar);
+        p.wait();
+    }
+}
+
+
+void Cameras::detect_seek() {
+    /*
+     * What this is:
+     * 
+     * We're detecting whether the 2 known Seek thermal USB cameras are connected, then constructing
+     * arguments for the seekthermal driver depending on which model it is. We then run the seek driver
+     * with systemd using the arguments file we provided to it in seekthermal.service in the libseek-thermal 
+     * package.
+     *
+     * What happens after:
+     * 
+     * The systemd service starts, finds the camera and begins running on the device node we select. Then
+     * we will let it be found by the rest of this class just like any other camera, so it gets recorded 
+     * in the manifest and found by the camera service.
+     *
+     *
+     * todo: this should pull the camera settings from the settings file if available
+     */
+    
+    libusb_context *context = nullptr;
+    int result = libusb_init(&context);
+    if (result) {
+        std::cerr << "Failed to initialize libusb" << std::endl;
+        return;
+    }
+
+    libusb_device_handle *handle_compact = libusb_open_device_with_vid_pid(nullptr, SEEK_COMPACT_VENDOR_ID, SEEK_COMPACT_PRODUCT_ID);
+    libusb_device_handle *handle_compact_pro = libusb_open_device_with_vid_pid(nullptr, SEEK_COMPACT_PRO_VENDOR_ID, SEEK_COMPACT_PRO_PRODUCT_ID);
+    
+    // todo: this will need to be pulled from the config, we may end up running these from the camera service so that
+    //       it can see the camera settings, which are not visible to openhd-system early at boot
+    std::string model;
+    std::string fps;
+
+    if (handle_compact) {
+        std::cerr << "Found seek" << std::endl;
+        model = "seek";
+        fps = "7";
+    }
+
+    if (handle_compact_pro) {
+        std::cerr << "Found seekpro" << std::endl;
+        model = "seekpro";
+        // todo: this is not necessarily accurate, not all compact pro models are 15hz
+        fps = "15";
+    }
+
+    if (handle_compact_pro || handle_compact) {
+        std::cerr << "Found seek thermal camera" << std::endl;
+
+        std::ofstream _u("/etc/openhd/seekthermal.conf", std::ios::binary | std::ios::out);
+        // todo: this should be more dynamic and allow for multiple cameras
+        _u << "DeviceNode=/dev/video4";
+        _u << std::endl;
+        _u << "SeekModel=";
+        _u << model;
+        _u << std::endl;
+        _u << "FPS=";
+        _u << fps;
+        _u << std::endl;
+        _u << "SeekColormap=11";
+        _u << std::endl;
+        _u << "SeekRotate=11";
+        _u << std::endl;
+        _u.close();
+
+        std::vector<std::string> ar { 
+            "start", "seekthermal"
+        };
+
+        boost::process::child p(boost::process::search_path("systemctl"), ar);
+        p.wait();
+    }
+}
+
 
 nlohmann::json Cameras::generate_manifest() {
     nlohmann::json j = nlohmann::json::array();
@@ -434,6 +563,7 @@ nlohmann::json Cameras::generate_manifest() {
                 {"vid",           camera.vid },
                 {"pid",           camera.pid },
                 {"bus",           camera.bus },
+                {"index",         camera.index },
                 {"endpoints",     endpoints }
             };
 

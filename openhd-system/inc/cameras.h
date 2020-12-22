@@ -37,7 +37,9 @@ private:
     void detect_jetson_csi();
     void detect_rockchip_csi();
 
-
+    void detect_flir();
+    void detect_seek();
+    
     void detect_v4l2();
     void probe_v4l2_device(std::string device_node);
     bool process_video_node(Camera& camera, CameraEndpoint& endpoint, std::string node);
@@ -47,6 +49,8 @@ private:
 
     std::vector<Camera> m_cameras;
     std::vector<CameraEndpoint> m_camera_endpoints;
+
+    int m_discover_index = 0;
 
     PlatformType m_platform_type;
     BoardType m_board_type;

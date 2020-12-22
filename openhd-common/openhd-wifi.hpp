@@ -31,10 +31,22 @@ typedef enum WiFiHotspotType {
 struct WiFiCard {
     WiFiCardType type;
     std::string name;
+    std::string vendor;
+    std::string mac;
     bool supports_5ghz;
     bool supports_2ghz;
     bool supports_injection;
+    bool supports_hotspot;
     bool supports_rts;
+
+    std::string frequency;
+    std::string txpower;
+    std::string use_for;
+    std::string wifi_client_ap_name;
+    std::string wifi_client_password;
+    std::string hotspot_channel;
+    std::string hotspot_password;
+    std::string hotspot_band;
 };
 
 

@@ -12,6 +12,7 @@ typedef enum PlatformType {
     PlatformTypeNanoPi,
     PlatformTypeiMX6,
     PlatformTypeRockchip,
+    PlatformTypeZynq,
     PlatformTypePC,
     PlatformTypeUnknown
 } PlatformType;
@@ -36,6 +37,8 @@ typedef enum BoardType {
     BoardTypeJetsonNX,
     BoardTypeJetsonAGX,
     BoardTypeNanoPiNeo4,
+    BoardTypePynqZ1,
+    BoardTypePynqZ2,
     BoardType3DRSolo,
     BoardTypeGenericPC,
     BoardTypeUnknown
@@ -128,6 +131,12 @@ inline std::string board_type_to_string(BoardType board_type) {
         case BoardTypeNanoPiNeo4: {
             return "nanopi-neo4";
         }
+        case BoardTypePynqZ1: {
+            return "pynqz1";
+        }
+        case BoardTypePynqZ2: {
+            return "pynqz2";
+        }
         case BoardType3DRSolo: {
             return "3dr-solo";
         }
@@ -155,6 +164,9 @@ inline std::string platform_type_to_string(PlatformType platform_type) {
         case PlatformTypeiMX6: {
             return "imx6";
         }
+        case PlatformTypeZynq: {
+            return "zynq";
+        }
         case PlatformTypePC: {
             return "pc";
         }
@@ -174,6 +186,8 @@ inline PlatformType string_to_platform_type(std::string platform_type) {
         return PlatformTypeNanoPi;
     } else if (to_uppercase(platform_type).find(to_uppercase("imx6")) != std::string::npos) {
         return PlatformTypeiMX6;
+    } else if (to_uppercase(platform_type).find(to_uppercase("zynq")) != std::string::npos) {
+        return PlatformTypeZynq;
     } else if (to_uppercase(platform_type).find(to_uppercase("pc")) != std::string::npos) {
         return PlatformTypePC;
     }

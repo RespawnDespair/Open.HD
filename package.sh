@@ -71,33 +71,42 @@ mkdir -p ${TMPDIR}/usr/local/share/wifibroadcast-scripts || exit 1
 
 build_pi_dep() {
     pushd /opt/vc/src/hello_pi/libs/ilclient
-    make || exit 1
+    make -j3 || exit 1
     popd
 }
 
 
 build_source() {
+    pushd lib/fmt
+    rm -r build
+    mkdir -p build
+    pushd build
+    cmake ../
+    make -j3 || exit 1
+    popd
+    popd
+
     pushd openhd-system
     make clean
-    make || exit 1
+    make -j3 || exit 1
     make install DESTDIR=${TMPDIR} || exit 1
     popd
 
     pushd openhd-security
     make clean
-    make || exit 1
+    make -j3 || exit 1
     make install DESTDIR=${TMPDIR} || exit 1
     popd
 
     pushd openhd-interface
     make clean
-    make || exit 1
+    make -j3 || exit 1
     make install DESTDIR=${TMPDIR} || exit 1
     popd
 
     pushd openhd-status
     make clean
-    make || exit 1
+    make -j3 || exit 1
     make install DESTDIR=${TMPDIR} || exit 1
     popd
 
@@ -111,7 +120,7 @@ build_source() {
     if [[ "${PLATFORM}" == "pi" && "${DISTRO}" == "stretch" ]]; then
         pushd openvg
         make clean
-        make library || exit 1
+        make -j3 library || exit 1
         make install DESTDIR=${TMPDIR} || exit 1
         popd
     fi
@@ -119,7 +128,7 @@ build_source() {
     if [[ "${PLATFORM}" == "pi" ]]; then
         pushd wifibroadcast-hello_video
         make clean
-        make || exit 1
+        make -j3 || exit 1
         make install DESTDIR=${TMPDIR} || exit 1
         popd
     fi
@@ -134,14 +143,14 @@ build_source() {
     cp -a rctx ${TMPDIR}/usr/local/bin/ || exit 1
 
     make clean
-    make || exit 1
+    make -j3 || exit 1
     make install DESTDIR=${TMPDIR} || exit 1
     popd
 
     if [[ "${PLATFORM}" == "pi" && "${DISTRO}" == "stretch" ]]; then
         pushd wifibroadcast-osd
         make clean
-        make || exit 1
+        make -j3 || exit 1
         make install DESTDIR=${TMPDIR} || exit 1
         cp -a osdfonts/* ${TMPDIR}/usr/local/share/openhd/osdfonts/ || exit 1
         popd
@@ -161,13 +170,18 @@ build_source() {
 
     cp -a gnuplot/* ${TMPDIR}/usr/local/share/openhd/gnuplot/ || exit 1
 
-    cp -a config/* ${TMPDIR}/boot/ || exit 1
     if [[ "${PLATFORM}" == "pi" && "${DISTRO}" == "buster" ]]; then
         cat << EOF >> ${TMPDIR}/boot/config.txt
 [all]
 dtoverlay=vc4-fkms-v3d
 EOF
     fi
+
+    cp -a config/camera.template ${TMPDIR}/usr/local/share/openhd/ || exit 1
+    cp -a config/ethernetcard.template ${TMPDIR}/usr/local/share/openhd/ || exit 1
+    cp -a config/general.template ${TMPDIR}/usr/local/share/openhd/ || exit 1
+    cp -a config/vpn.template ${TMPDIR}/usr/local/share/openhd/ || exit 1
+    cp -a config/wificard.template ${TMPDIR}/usr/local/share/openhd/ || exit 1
 }
 
 if [[ "${PLATFORM}" == "pi" ]]; then
@@ -186,7 +200,6 @@ fpm -a ${PACKAGE_ARCH} -s dir -t deb -n ${PACKAGE_NAME} -v ${VERSION//v} -C ${TM
   --config-files /boot/cmdline.txt \
   --config-files /boot/config.txt \
   --config-files /boot/joyconfig.txt \
-  --config-files /boot/osdconfig.txt \
   -p ${PACKAGE_NAME}_VERSION_ARCH.deb \
   --after-install after-install.sh \
   --before-install before-install.sh \
@@ -194,13 +207,11 @@ fpm -a ${PACKAGE_ARCH} -s dir -t deb -n ${PACKAGE_NAME} -v ${VERSION//v} -C ${TM
   -d "libasio-dev >= 1.10" \
   -d "libboost-system-dev >= 1.62.0" \
   -d "libboost-program-options-dev >= 1.62.0" \
-  -d "openhd-router >= 0.1.8" \
   -d "openhd-microservice >= 0.1.18" \
   -d "libseek-thermal >= 20200801.1" \
   -d "flirone-driver >= 20200704.3" \
-  -d "mavlink-router >= 20200704.3" \
   -d "wifibroadcast >= 20200930.1" \
-  -d "dump1090-fa >= 20201024.1" \
+  -d "openhd-dump1090-mutability >= 20201122.2" \
   -d "gnuplot-nox" \
   -d "hostapd" \
   -d "iw" \

@@ -15,18 +15,17 @@
 
 class WiFi {
 public:
-    WiFi(boost::asio::io_service &io_service);
+    WiFi(boost::asio::io_service &io_service, bool is_air, std::string unit_id);
     
     virtual ~WiFi() {}
 
     void process_manifest();
     void configure();
 
-    void process_card(WiFiCard card);
+    void process_card(WiFiCard &card);
 
-    void setup_hotspot(WiFiCard card);
+    void setup_hotspot(WiFiCard &card);
 
-    bool set_card_name(WiFiCard card, std::string name);
     bool set_card_state(WiFiCard card, bool up);
     bool set_frequency(WiFiCard card, std::string frequency);
     bool set_txpower(WiFiCard card, std::string txpower);
@@ -36,8 +35,14 @@ public:
         return m_broadcast_cards;
     }
 
+    void save_settings(std::vector<WiFiCard> cards, std::string settings_file);
+
 private:
     boost::asio::io_service &m_io_service;
+
+    std::string m_unit_id;
+
+    bool m_is_air = false;
 
     std::vector<WiFiCard> m_wifi_cards;
     
@@ -47,6 +52,7 @@ private:
     
     // todo: read from settings file once new settings system merged
     std::string m_wifi_hotspot_address = "192.168.2.1";
+    std::string m_wifi_hotspot_txpower = "3100";
 
     std::string m_default_5ghz_frequency = "5180";
     std::string m_default_2ghz_frequency = "2412";

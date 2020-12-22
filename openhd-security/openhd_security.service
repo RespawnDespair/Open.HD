@@ -1,11 +1,9 @@
 [Unit]
 Description=openhd-security
-Before=basic.target
-After=local-fs.target sysinit.target
-DefaultDependencies=no
+After=openhd_system.service
 
 [Service]
-Type=oneshot
+Type=notify
 RemainAfterExit=true
 ExecStart=/usr/local/bin/openhd_security
 

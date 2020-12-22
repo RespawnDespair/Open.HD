@@ -16,24 +16,85 @@
 #include <boost/regex.hpp>
 
 #include "json.hpp"
+#include "inja.hpp"
+using namespace inja;
+using json = nlohmann::json;
 
 #include "openhd-status.hpp"
+#include "openhd-settings.hpp"
 #include "openhd-wifi.hpp"
 #include "openhd-util.hpp"
 
 
 #include "wifi.h"
 
-WiFi::WiFi(boost::asio::io_service &io_service): m_io_service(io_service) {}
+WiFi::WiFi(boost::asio::io_service &io_service, bool is_air, std::string unit_id): m_io_service(io_service), m_is_air(is_air), m_unit_id(unit_id) {}
 
 
 void WiFi::configure() {
     std::cout << "WiFi::configure()" << std::endl;
 
+    /*
+     * Find out which cards are connected first
+     */
     process_manifest();
 
+
+    /*
+     * Then get the local settings, if there are any
+     */
+    std::vector<std::map<std::string, std::string> > settings;
+
+    try {
+        std::string settings_path = find_settings_path(m_is_air, m_unit_id);
+        std::cerr << "settings_path: " << settings_path << std::endl;
+        std::string settings_file = settings_path + "/wifi.conf";
+        std::cerr << "settings_file: " << settings_file << std::endl;
+        settings = read_config(settings_file);
+    } catch (std::exception &ex) {
+        std::cerr << "WiFi settings load error: " << ex.what() << std::endl;
+    }
+
+
+    /*
+     * Now use the settings to override the detected hardware configuration in each WiFiCard in m_wifi_cards
+     *
+     */
+    std::vector<WiFiCard> save_cards;
+
     for (auto card : m_wifi_cards) {
+        std::map<std::string, std::string> setting_map;
+
+        for (auto & settings_for_card : settings) {
+            if (settings_for_card.count("mac") == 1 && settings_for_card["mac"] == card.mac) {
+                setting_map = settings_for_card;
+                break;
+            }
+        }
+
+        if (setting_map.count("frequency")) card.frequency = setting_map["frequency"];
+        if (setting_map.count("txpower")) card.txpower = setting_map["txpower"];
+        if (setting_map.count("use_for")) card.use_for = setting_map["use_for"];
+        if (setting_map.count("wifi_client_ap_name")) card.wifi_client_ap_name = setting_map["wifi_client_ap_name"];
+        if (setting_map.count("wifi_client_password")) card.wifi_client_password = setting_map["wifi_client_password"];
+        if (setting_map.count("hotspot_channel")) card.hotspot_channel = setting_map["hotspot_channel"];
+        if (setting_map.count("hotspot_password")) card.hotspot_password = setting_map["hotspot_password"];
+        if (setting_map.count("hotspot_band")) card.hotspot_band = setting_map["hotspot_band"];
+
         process_card(card);
+        save_cards.push_back(card);
+    }
+
+    /*
+     * And now save the complete set of wifi cards back to the settings file, ensuring that all hardware
+     * ends up in the file automatically but users can change it as needed
+     */
+    try {
+        std::string settings_path = find_settings_path(m_is_air, m_unit_id);
+        std::string settings_file = settings_path + "/wifi.conf";
+        save_settings(save_cards, settings_file);
+    } catch (std::exception &ex) {
+        status_message(STATUS_LEVEL_EMERGENCY, "WiFi settings save failed");
     }
 }
 
@@ -55,8 +116,10 @@ void WiFi::process_manifest() {
 
             card.supports_5ghz = _card["supports_5ghz"];
             card.supports_2ghz = _card["supports_2ghz"];
-            card.supports_rts = _card["supports_injection"];
-            card.supports_injection = _card["supports_rts"];
+            card.supports_injection = _card["supports_injection"];
+            card.supports_hotspot = _card["supports_hotspot"];
+            card.supports_rts = _card["supports_rts"];
+            card.mac = _card["mac"];
 
             m_wifi_cards.push_back(card);
         }
@@ -69,17 +132,27 @@ void WiFi::process_manifest() {
 }
 
 
-void WiFi::process_card(WiFiCard card) {
+void WiFi::process_card(WiFiCard &card) {
     std::cerr << "Processing card: " << card.name << std::endl;
 
-    /*
-     * todo: this does not yet handle hotspot cards that also happen to support injection, for that
-     *      we will have to let users mark one as being for hotspot use in the new settings system, once it's merged
-     */
-     if (!card.supports_injection) {
-         setup_hotspot(card);
-         return;
+    // if there isn't a settings file for this card yet, this field will not be set and it will
+    // be up to the autodetected settings from the system service to decide what this card will be
+    // used for
+    if (card.use_for == "hotspot") {
+        setup_hotspot(card);
+        return;
     }
+
+    }
+
+
+    if (!card.supports_injection) {
+        std::cerr << "Card does not support injection: " << card.name << std::endl;
+        setup_hotspot(card);
+        return;
+    }
+
+    card.use_for = "wifibroadcast";
 
 
     // todo: errors encountered here need to be submitted to the status service, users will never see stdout
@@ -87,82 +160,122 @@ void WiFi::process_card(WiFiCard card) {
     enable_monitor_mode(card);
     set_card_state(card, true);
 
-    // todo: temporary hardcoding until new settings system is merged
-    if (card.supports_5ghz) {
-        set_frequency(card, m_default_5ghz_frequency);
+    
+    if (!card.frequency.empty()) {
+        set_frequency(card, card.frequency);
     } else {
-        set_frequency(card, m_default_2ghz_frequency);
+        if (card.supports_5ghz) {
+            set_frequency(card, m_default_5ghz_frequency);
+            card.frequency = m_default_5ghz_frequency;
+        } else {
+            set_frequency(card, m_default_2ghz_frequency);
+            card.frequency = m_default_2ghz_frequency;
+        }
     }
 
-    // todo: temporary hardcoding until new settings system is merged    
-    set_txpower(card, "54");
+    if (!card.txpower.empty()) {
+        set_txpower(card, card.txpower);
+    } else {
+        set_txpower(card, "3100");
+        card.txpower = "3100";
+    }
 
     m_broadcast_cards.push_back(card);
 }
 
 
 /*
- * todo: signal systemd to start the hostapd and dnsmasq services afterward by signaling we've reached wifi-hotspot-interface.target
  *
  * todo: deduplicate this and similar logic in Ethernet/LTE, they should be subclasses of a common base
  */
-void WiFi::setup_hotspot(WiFiCard card) {
+void WiFi::setup_hotspot(WiFiCard &card) {
     std::cout << "WiFi::setup_hotspot()" << std::endl;
+
+    if (!card.supports_hotspot) {
+        std::ostringstream message;
+        message << "WiFi hotspot not supported on ";
+        message << wifi_card_type_to_string(card.type);
+        message << "cards (";
+        message << card.name;
+        message << ")";
+        message << std::endl;
+        status_message(STATUS_LEVEL_INFO, message.str());
+        return;
+    }
+
+    bool success = false;
 
     if (m_hotspot_configured) {
         std::cout << "WiFi::setup_hotspot: already configured with another card" << std::endl;
         return;
     }
 
-    // todo: we really shouldn't be renaming the interface, we should just inform hostapd and dnsmasq which
-    //       interface to use, but this is the right way to go for now.
-    bool success = set_card_name(card, "wifihotspot0");
-
-    if (!success) {
-        status_message(STATUS_LEVEL_WARNING, "Failed to rename wifi hotspot interface");
-        std::cout << "WiFi::setup_hotspot: renaming interface failed, wifi hotspot disabled" << std::endl;
-        return;
-    }
-
+    card.use_for = "hotspot";
 
     // todo: allow the interface address to be configured. this requires changing the dnsmasq config file though, not
     //       just the interface address. 
-    std::vector<std::string> args { "wifihotspot0", m_wifi_hotspot_address, "up", };
+    std::vector<std::string> args { card.name, m_wifi_hotspot_address, "up", };
 
     success = run_command("ifconfig", args);
 
     if (!success) {
         status_message(STATUS_LEVEL_WARNING, "Failed to enable wifi hotspot interface");
-        std::cout << "WiFi::setup_hotspot: bringing up interface failed, wifi hotspot disabled" << std::endl;
         return;
     }
 
-
-    std::ostringstream message1;
-    message1 << "WiFi hotspot enabled on frequency: ";
-
-    if (card.supports_5ghz) {
-        message1 << m_default_5ghz_frequency;
-    } else {
-        message1 << m_default_2ghz_frequency;
+    /*
+     * Note: This is not currently choosing to use the band that wifibroadcast cards are not using. Most
+     *       people seem to choose not to use the G band no matter what, so we might as well just default to 5Ghz
+     *       and then perhaps lean on FEC to avoid interference, it's far more likely things will work that way
+     *       than to prefer the 2.4ghz band in any situation.
+     *
+     */
+    if (card.hotspot_channel.empty()) {
+        if (card.supports_5ghz) {
+            card.hotspot_channel = "165";
+        } else {
+            card.hotspot_channel = "11";
+        }
     }
 
+    if (card.hotspot_band.empty()) {
+        if (card.supports_5ghz) {
+            card.hotspot_band = "a";
+        } else {
+            card.hotspot_band = "g";
+        }
+    }
+
+    if (card.txpower.empty()) {
+        card.txpower = m_wifi_hotspot_txpower;
+    }
+
+    if (card.hotspot_password.empty()) {
+        card.hotspot_password = "wifiopenhd";
+    }
+
+    std::ostringstream message1;
+    message1 << "WiFi hotspot enabled on band ";
+    message1 << card.hotspot_band;
+    message1 << " channel ";
+    message1 << card.hotspot_channel;
     message1 << std::endl;
     status_message(STATUS_LEVEL_INFO, message1.str());
 
+    {
+        std::vector<std::string> args { 
+            "/usr/local/share/wifibroadcast-scripts/wifi_hotspot.sh", card.hotspot_band, card.hotspot_channel, card.name, card.txpower, card.hotspot_password
+        };
 
+        success = run_command("/bin/bash", args);
+
+        if (!success) {
+            status_message(STATUS_LEVEL_WARNING, "Failed to enable hostap on wifi hotspot");
+            return;
+        }
+    }
+    
     m_hotspot_configured = true;
-}
-
-
-bool WiFi::set_card_name(WiFiCard card, std::string name) {
-    std::cout << "WiFi::set_card_name()" << std::endl;
-
-    std::vector<std::string> args { "link", "set", card.name, "name", name };
-
-    bool success = run_command("ip", args);
-
-    return success;
 }
 
 
@@ -191,7 +304,7 @@ bool WiFi::set_frequency(WiFiCard card, std::string frequency) {
 bool WiFi::set_txpower(WiFiCard card, std::string txpower) {
     std::cout << "WiFi::set_txpower(" << txpower << ")" << std::endl;
 
-    std::vector<std::string> args { "dev", card.name, "set", "txpower", txpower };
+    std::vector<std::string> args { "dev", card.name, "set", "txpower", "fixed", txpower };
 
     bool success = run_command("iw", args);
 
@@ -207,4 +320,44 @@ bool WiFi::enable_monitor_mode(WiFiCard card) {
     bool success = run_command("iw", args);
 
     return success;
+}
+
+
+void WiFi::save_settings(std::vector<WiFiCard> cards, std::string settings_file) {
+    Environment env;
+
+    // load the wifi card template, we format it once for each card and write that to the file
+    std::ifstream template_file("/usr/local/share/openhd/wificard.template");
+    std::string template_s((std::istreambuf_iterator<char>(template_file)),
+                          std::istreambuf_iterator<char>());
+
+
+    std::ofstream out(settings_file);
+
+    // now fill in the template params
+    for (auto & card : cards) {
+        json data;
+
+        data["type"] = wifi_card_type_to_string(card.type);
+        data["mac"] = card.mac;
+        data["name"] = card.name;
+        data["vendor"] = card.vendor;
+        data["frequency"] = card.frequency;
+        data["txpower"] = card.txpower;
+        data["use_for"] = card.use_for;
+        data["wifi_client_ap_name"] = card.wifi_client_ap_name;
+        data["wifi_client_password"] = card.wifi_client_password;
+        data["hotspot_channel"] = card.hotspot_channel;
+        data["hotspot_password"] = card.hotspot_password;
+        data["hotspot_band"] = card.hotspot_band;
+
+        Template temp = env.parse(template_s.c_str());
+        std::string rendered = env.render(temp, data);
+
+        // and write this card to the settings file
+        out << rendered;
+        out << "\n\n";
+    }
+    
+    out.close();
 }

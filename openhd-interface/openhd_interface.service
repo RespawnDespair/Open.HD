@@ -1,9 +1,9 @@
 [Unit]
 Description=openhd-interface
-After=openhd-system.target
+After=openhdsecurity.service
 
 [Service]
-Type=simple
+Type=notify
 ExecStart=/usr/local/bin/openhd_interface
 
 [Install]

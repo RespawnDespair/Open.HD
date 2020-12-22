@@ -1,12 +1,10 @@
 [Unit]
 Description=openhd-system
-Before=basic.target
-After=local-fs.target sysinit.target
-DefaultDependencies=no
+After=local-fs.target sysinit.target conf.mount
 
 
 [Service]
-Type=oneshot
+Type=notify
 RemainAfterExit=true
 ExecStart=/usr/local/bin/openhd_system
 

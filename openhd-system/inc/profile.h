@@ -21,15 +21,24 @@ public:
 
     nlohmann::json generate_manifest();
 
+    std::string generate_unit_id();
+
+    bool is_air() {
+        return m_camera_count != 0;
+    }
+
+    std::string unit_id() {
+        return m_unit_id;
+    }
+
 private:
     PlatformType m_platform_type;
     BoardType m_board_type;
     CarrierType m_carrier_type;
 
     int m_camera_count = 0;
-
-    uint8_t m_profile = 1;
-    std::string m_settings_file = "/boot/openhd-settings-1.txt";
+    
+    std::string m_unit_id;
 };
 
 #endif

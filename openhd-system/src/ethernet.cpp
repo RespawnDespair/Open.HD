@@ -94,8 +94,19 @@ void Ethernet::process_card(std::string interface_name) {
 
     std::string driver_name = result[1];
 
+    std::stringstream address;
+    address << "/sys/class/net/";
+    address << interface_name;
+    address << "/address";
+    
     EthernetCard card;
     card.name = interface_name;
+    
+    std::ifstream f(address.str());
+    std::string mac((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());  
+    boost::trim_right(mac);
+
+    card.mac = mac;
 
     card.type = string_to_ethernet_card_type(driver_name);
 
@@ -112,7 +123,8 @@ nlohmann::json Ethernet::generate_manifest() {
         try {
             nlohmann::json card = { 
                 {"type",               ethernet_card_type_to_string(_card.type) }, 
-                {"name",               _card.name }
+                {"name",               _card.name },
+                {"mac",                _card.mac },
             };
 
             std::ostringstream message;
