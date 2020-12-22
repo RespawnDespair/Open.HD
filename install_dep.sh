@@ -7,8 +7,7 @@ apt -y install build-essential autotools-dev automake libtool autoconf \
             libgstreamer-plugins-base1.0-dev \
             libboost-dev libboost-program-options-dev libboost-system-dev libasio-dev libboost-chrono-dev libsystemd-dev \
             libboost-regex-dev libboost-filesystem-dev libboost-thread-dev indent libv4l-dev libnl-3-dev libnl-genl-3-dev \
-            lifepoweredpi python python-lxml || exit 1
-
+            python python-lxml || exit 1
 
 curl https://bootstrap.pypa.io/get-pip.py --output get-pip.py || exit 1
 

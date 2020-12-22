@@ -2,10 +2,6 @@ FROM openhd/armbian_20.08_buster_arm64:v2
 
 RUN apt update
 
-COPY install_dep.sh /data/install_dep.sh
-
-RUN /data/install_dep.sh
-
 COPY . /data/
 
 WORKDIR /data

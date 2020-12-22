@@ -34,6 +34,9 @@ echo "deb https://dl.cloudsmith.io/public/openhd/openhd-2-1/deb/${OS} ${DISTRO} 
 
 apt -y update || exit 1
 
+# Needs to be done here, comes from the cloudsmith repo
+apt -y install lifepoweredpi || exit 1
+
 ./install_dep.sh || exit 1
 
 # Create the Open.HD MAVLink dialect
