@@ -3,14 +3,14 @@
 
 #define MAVLINK_MSG_ID_OPENHD_CAMERA_SETTINGS 1200
 
-MAVPACKED(
+
 typedef struct __mavlink_openhd_camera_settings_t {
  uint8_t target_system; /*<  system id of the requesting system*/
  uint8_t target_component; /*<  component id of the requesting component*/
  uint8_t brightness; /*<  brightness*/
  uint8_t contrast; /*<  contrast*/
  uint8_t saturation; /*<  saturation*/
-}) mavlink_openhd_camera_settings_t;
+} mavlink_openhd_camera_settings_t;
 
 #define MAVLINK_MSG_ID_OPENHD_CAMERA_SETTINGS_LEN 5
 #define MAVLINK_MSG_ID_OPENHD_CAMERA_SETTINGS_MIN_LEN 5

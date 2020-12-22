@@ -3,7 +3,7 @@
 
 #define MAVLINK_MSG_ID_OPENHD_AIR_TELEMETRY 1211
 
-MAVPACKED(
+
 typedef struct __mavlink_openhd_air_telemetry_t {
  uint32_t damaged_block_cnt; /*<  damaged_block_cnt*/
  uint32_t lost_packet_cnt; /*<  lost_packet_cnt*/
@@ -12,7 +12,7 @@ typedef struct __mavlink_openhd_air_telemetry_t {
  uint8_t target_system; /*<  system id of the requesting system*/
  uint8_t target_component; /*<  component id of the requesting component*/
  uint8_t current_signal_dbm; /*<  current_signal_dbm*/
-}) mavlink_openhd_air_telemetry_t;
+} mavlink_openhd_air_telemetry_t;
 
 #define MAVLINK_MSG_ID_OPENHD_AIR_TELEMETRY_LEN 19
 #define MAVLINK_MSG_ID_OPENHD_AIR_TELEMETRY_MIN_LEN 19

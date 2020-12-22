@@ -3,12 +3,12 @@
 
 #define MAVLINK_MSG_ID_OPENHD_GPIO_STATE 1250
 
-MAVPACKED(
+
 typedef struct __mavlink_openhd_gpio_state_t {
  uint8_t target_system; /*<  system id of the requesting system*/
  uint8_t target_component; /*<  component id of the requesting component*/
  uint8_t pins; /*<  pins*/
-}) mavlink_openhd_gpio_state_t;
+} mavlink_openhd_gpio_state_t;
 
 #define MAVLINK_MSG_ID_OPENHD_GPIO_STATE_LEN 3
 #define MAVLINK_MSG_ID_OPENHD_GPIO_STATE_MIN_LEN 3

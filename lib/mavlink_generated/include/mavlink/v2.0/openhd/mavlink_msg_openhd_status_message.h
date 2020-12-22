@@ -3,14 +3,14 @@
 
 #define MAVLINK_MSG_ID_OPENHD_STATUS_MESSAGE 1260
 
-MAVPACKED(
+
 typedef struct __mavlink_openhd_status_message_t {
  uint64_t timestamp; /*<  timestamp when message was originally generated*/
  uint8_t target_system; /*<  system id of the requesting system*/
  uint8_t target_component; /*<  component id of the requesting component*/
  uint8_t severity; /*<  severity level, relies on the definitions within RFC-5424.*/
  char text[50]; /*<  status message, 49 character max length since it *must* be null-terminated*/
-}) mavlink_openhd_status_message_t;
+} mavlink_openhd_status_message_t;
 
 #define MAVLINK_MSG_ID_OPENHD_STATUS_MESSAGE_LEN 61
 #define MAVLINK_MSG_ID_OPENHD_STATUS_MESSAGE_MIN_LEN 61

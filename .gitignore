@@ -1,3 +1,6 @@
 
 .DS_Store
 *.o
+
+
+lib/mavlink_generated/include/mavlink/v2.0

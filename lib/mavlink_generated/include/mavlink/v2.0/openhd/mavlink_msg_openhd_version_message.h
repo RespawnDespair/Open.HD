@@ -3,12 +3,12 @@
 
 #define MAVLINK_MSG_ID_OPENHD_VERSION_MESSAGE 1261
 
-MAVPACKED(
+
 typedef struct __mavlink_openhd_version_message_t {
  uint8_t target_system; /*<  system id of the requesting system*/
  uint8_t target_component; /*<  component id of the requesting component*/
  char version[30]; /*<  version string, 29 character max length since it *must* be null-terminated*/
-}) mavlink_openhd_version_message_t;
+} mavlink_openhd_version_message_t;
 
 #define MAVLINK_MSG_ID_OPENHD_VERSION_MESSAGE_LEN 32
 #define MAVLINK_MSG_ID_OPENHD_VERSION_MESSAGE_MIN_LEN 32

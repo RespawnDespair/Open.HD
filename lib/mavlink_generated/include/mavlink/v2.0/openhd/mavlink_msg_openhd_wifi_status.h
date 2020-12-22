@@ -3,7 +3,7 @@
 
 #define MAVLINK_MSG_ID_OPENHD_WIFI_STATUS 1212
 
-MAVPACKED(
+
 typedef struct __mavlink_openhd_wifi_status_t {
  uint32_t received_packet_cnt[4]; /*<  received_packet_cnt*/
  uint8_t target_system; /*<  system id of the requesting system*/
@@ -11,7 +11,7 @@ typedef struct __mavlink_openhd_wifi_status_t {
  uint8_t wifi_adapter_cnt; /*<  wifi_adapter_cnt*/
  int8_t current_signal_dbm[4]; /*<  current_signal_dbm*/
  uint8_t wifi_card_type[4]; /*<  wifi_card_type*/
-}) mavlink_openhd_wifi_status_t;
+} mavlink_openhd_wifi_status_t;
 
 #define MAVLINK_MSG_ID_OPENHD_WIFI_STATUS_LEN 27
 #define MAVLINK_MSG_ID_OPENHD_WIFI_STATUS_MIN_LEN 27

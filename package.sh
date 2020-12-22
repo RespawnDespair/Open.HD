@@ -34,6 +34,13 @@ echo "deb https://dl.cloudsmith.io/public/openhd/openhd-2-1/deb/${OS} ${DISTRO} 
 
 apt -y update || exit 1
 
+./install_dep.sh || exit 1
+
+# Create the Open.HD MAVLink dialect
+pushd lib
+./generate_mavlink.py || exit 1
+popd
+
 PACKAGE_NAME=openhd
 
 TMPDIR=/tmp/${PACKAGE_NAME}-installdir
@@ -66,8 +73,6 @@ mkdir -p ${TMPDIR}/usr/local/share/openhd || exit 1
 mkdir -p ${TMPDIR}/usr/local/share/openhd/osdfonts || exit 1
 mkdir -p ${TMPDIR}/usr/local/share/openhd/gnuplot || exit 1
 mkdir -p ${TMPDIR}/usr/local/share/wifibroadcast-scripts || exit 1
-
-./install_dep.sh || exit 1
 
 build_pi_dep() {
     pushd /opt/vc/src/hello_pi/libs/ilclient
@@ -111,7 +116,12 @@ build_source() {
     popd
 
     cp openhd-common/* ${TMPDIR}/usr/local/include || exit 1
-    
+
+    pushd openhd-microservices
+    make clean
+    make -j3 || exit 1
+    make install DESTDIR=${TMPDIR} || exit 1
+    popd    
 
     # legacy stuff, we should be working to reduce and eventually eliminate most of the stuff below
     # this line, aside from overlay files and default settings templates
